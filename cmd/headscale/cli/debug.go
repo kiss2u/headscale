@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	v1 "github.com/juanfont/headscale/gen/go/headscale/v1"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc/status"
@@ -64,11 +64,9 @@ var createNodeCmd = &cobra.Command{
 		user, err := cmd.Flags().GetString("user")
 		if err != nil {
 			ErrorOutput(err, fmt.Sprintf("Error getting user: %s", err), output)
-
-			return
 		}
 
-		ctx, client, conn, cancel := getHeadscaleCLIClient()
+		ctx, client, conn, cancel := newHeadscaleCLIWithConfig()
 		defer cancel()
 		defer conn.Close()
 
@@ -79,29 +77,24 @@ var createNodeCmd = &cobra.Command{
 				fmt.Sprintf("Error getting node from flag: %s", err),
 				output,
 			)
-
-			return
 		}
 
-		machineKey, err := cmd.Flags().GetString("key")
+		registrationID, err := cmd.Flags().GetString("key")
 		if err != nil {
 			ErrorOutput(
 				err,
 				fmt.Sprintf("Error getting key from flag: %s", err),
 				output,
 			)
-
-			return
 		}
-		if !util.NodePublicKeyRegex.Match([]byte(machineKey)) {
-			err = errPreAuthKeyMalformed
+
+		_, err = types.RegistrationIDFromString(registrationID)
+		if err != nil {
 			ErrorOutput(
 				err,
-				fmt.Sprintf("Error: %s", err),
+				fmt.Sprintf("Failed to parse machine key from flag: %s", err),
 				output,
 			)
-
-			return
 		}
 
 		routes, err := cmd.Flags().GetStringSlice("route")
@@ -111,12 +104,10 @@ var createNodeCmd = &cobra.Command{
 				fmt.Sprintf("Error getting routes from flag: %s", err),
 				output,
 			)
-
-			return
 		}
 
 		request := &v1.DebugCreateNodeRequest{
-			Key:    machineKey,
+			Key:    registrationID,
 			Name:   name,
 			User:   user,
 			Routes: routes,
@@ -129,10 +120,8 @@ var createNodeCmd = &cobra.Command{
 				fmt.Sprintf("Cannot create node: %s", status.Convert(err).Message()),
 				output,
 			)
-
-			return
 		}
 
-		SuccessOutput(response.Node, "Node created", output)
+		SuccessOutput(response.GetNode(), "Node created", output)
 	},
 }
